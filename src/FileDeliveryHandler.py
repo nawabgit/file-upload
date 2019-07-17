@@ -1,6 +1,6 @@
 import requests
-from pathlib import Path
-from requests_toolbelt.multipart.encoder import MultipartEncoder
+import os
+from requests_toolbelt.multipart.encoder import MultipartEncoder, MultipartEncoderMonitor
 
 
 class FileDeliveryHandler:
@@ -11,17 +11,23 @@ class FileDeliveryHandler:
     def post_file_to_api(self, path):
         """
         Posts file to API using MultipartEncoder
-            so progress can be monitored
+        so progress can be monitored by using a callback
 
             :param path path to file
             :returns status JSON
         """
 
-        file = open(path, 'rb')
-        name = Path(path).with_suffix('').stem
-
-        encoder = MultipartEncoder({'file': (name, file)})
-        r = requests.post(self.post_url, files={'file': encoder},
-                          headers={'Content-Type': encoder.content_type})
+        name = os.path.basename(path)
+        encoder = MultipartEncoder(
+            fields={
+                'file': (name, open(path, 'rb'), 'application/octet-stream')
+            }
+        )
+        monitor = MultipartEncoderMonitor(encoder, progress)
+        r = requests.post(self.post_url, data=monitor, headers={'Content-Type': monitor.content_type})
 
         return r.text
+
+
+def progress(monitor):
+    print(round(monitor.bytes_read / monitor.len, 4) * 100)
